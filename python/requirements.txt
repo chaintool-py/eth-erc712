@@ -1,0 +1,2 @@
+chainlib-eth==0.4.17
+pysha3==1.0.2
