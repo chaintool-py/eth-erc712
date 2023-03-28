@@ -16,7 +16,6 @@ class ERC712Encoder(ABIContractEncoder):
     def __init__(self, struct_name):
         super(ERC712Encoder, self).__init__()
         self.method(struct_name)
-        self.ks = []
         self.encode = self.get_contents
 
 
@@ -28,16 +27,16 @@ class ERC712Encoder(ABIContractEncoder):
 
 
     def string(self, s):
-        self.types.append(ABIContractType.STRING)
         v = keccak256_string_to_hex(s)
         self.contents.append(v)
+        self.add_type(ABIContractType.STRING)
         self.__log_latest_erc712(s)
 
 
     def bytes(self, s):
-        self.types.append(ABIContractType.BYTES)
         v = keccak256_string_to_hex(s)
         self.contents.append(v)
+        self.add_type(ABIContractType.BYTES)
         self.__log_latest_erc712(s)
 
 
@@ -58,7 +57,7 @@ class ERC712Encoder(ABIContractEncoder):
 
 
     def get_contents(self):
-        return b'\x19\x01' + self.encode_type() + self.encode_data()
+        return self.encode_type() + self.encode_data()
 
 
 class EIP712Domain(ERC712Encoder):
@@ -75,3 +74,62 @@ class EIP712Domain(ERC712Encoder):
             self.add('verifyingContract', ABIContractType.ADDRESS, verifying_contract)
         if salt != None:
             self.add('salt', ABIContractType.BYTES32, salt)
+
+
+    def get_contents(self):
+        v = self.encode_type() + self.encode_data()
+        r = keccak256(v)
+        logg.debug('domainseparator material {} -> {}'.format(v.hex(), r.hex()))
+        return r
+
+
+class EIP712DomainEncoder(ERC712Encoder):
+    
+    def __init__(self, struct_name, domain):
+        assert domain.__class__.__name__ == 'EIP712Domain'
+        self.domain = domain
+        self.__cache_data = b''
+        super(EIP712DomainEncoder, self).__init__(struct_name)
+
+
+    def __cache(self):
+        if not self.dirty:
+            return
+        domain = self.domain.get_contents()
+        contents = super(EIP712DomainEncoder, self).get_contents()
+        self.__cache_data = domain + contents
+
+
+    def get_contents(self):
+        self.__cache()
+        return self.__cache_data
+
+
+    def get_domain(self):
+        self.__cache()
+        return self.__cache_data[:32]
+
+
+    def get_data_hash(self):
+        self.__cache()
+        return self.__cache_data[32:64]
+
+
+    def get_typed_data(self):
+        self.__cache()
+        return self.__cache_data[64:]
+
+
+    def __str__(self):
+        self.__cache()
+        domain = self.get_domain()
+        data_hash = self.get_data_hash()
+        data = self.get_typed_data()
+        s = 'erc712domain\t{}\nerc712type\t{}\nerc712data\n'.format(
+                domain.hex(),
+                data_hash.hex(),
+                )
+        for i in range(0, len(data), 32):
+            s += '\t' + data[i:i+32].hex() + '\n'
+
+        return s

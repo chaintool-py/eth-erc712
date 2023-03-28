@@ -1,7 +1,8 @@
-pragma solidity ^0.4.24;
+pragma solidity >0.6.11;
 
-// This file was copied from https://eips.ethereum.org/assets/eip-712/Example.sol
 // SPDX-License-Identifier: CC0-1.0
+// This file was copied from https://eips.ethereum.org/assets/eip-712/Example.sol
+// Slightly edited to make it work with test harness parameters
 
 contract Example {
     
@@ -10,6 +11,7 @@ contract Example {
         string  version;
         uint256 chainId;
         address verifyingContract;
+	bytes32 salt;
     }
 
     struct Person {
@@ -22,6 +24,8 @@ contract Example {
         Person to;
         string contents;
     }
+
+    bytes32 public salt;
 
     bytes32 constant EIP712DOMAIN_TYPEHASH = keccak256(
         "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
@@ -41,13 +45,13 @@ contract Example {
         DOMAIN_SEPARATOR = hash(EIP712Domain({
             name: "Ether Mail",
             version: '1',
-            chainId: 1,
-            // verifyingContract: this
-            verifyingContract: 0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC
+            chainId: 42,
+            verifyingContract: address(this),
+	    salt: blockhash(block.number)
         }));
     }
 
-    function hash(EIP712Domain eip712Domain) internal pure returns (bytes32) {
+    function hash(EIP712Domain memory eip712Domain) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             EIP712DOMAIN_TYPEHASH,
             keccak256(bytes(eip712Domain.name)),
@@ -57,7 +61,7 @@ contract Example {
         ));
     }
 
-    function hash(Person person) internal pure returns (bytes32) {
+    function hash(Person memory person) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             PERSON_TYPEHASH,
             keccak256(bytes(person.name)),
@@ -65,7 +69,7 @@ contract Example {
         ));
     }
 
-    function hash(Mail mail) internal pure returns (bytes32) {
+    function hash(Mail memory mail) internal pure returns (bytes32) {
         return keccak256(abi.encode(
             MAIL_TYPEHASH,
             hash(mail.from),
@@ -74,7 +78,7 @@ contract Example {
         ));
     }
 
-    function verify(Mail mail, uint8 v, bytes32 r, bytes32 s) internal view returns (bool) {
+    function verify(Mail memory mail, uint8 v, bytes32 r, bytes32 s) public view returns (bool) {
         // Note: we need to use `encodePacked` here instead of `encode`.
         bytes32 digest = keccak256(abi.encodePacked(
             "\x19\x01",
