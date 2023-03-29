@@ -105,7 +105,7 @@ class TestERC712(TestERC712Base):
         enc.string(mail_contents)
         data_contents = enc.get_contents()
 
-        logg.debug('encode structpointer')
+        logg.debug('encode struct data pointers')
         enc = ABIContractEncoder()
         enc.uint256(0x60)
         enc.uint256(0xe0)
@@ -123,7 +123,7 @@ class TestERC712(TestERC712Base):
         enc.typ(ABIContractType.UINT8)
         enc.typ(ABIContractType.BYTES32)
         enc.typ(ABIContractType.BYTES32)
-        enc.uint256(0x80) # outer struct pointer
+        enc.uint256(0x80) # start of struct data pointer
         enc.uintn(sig[64], 8)
         enc.bytes32(sig[:32])
         enc.bytes32(sig[32:64])
@@ -133,7 +133,7 @@ class TestERC712(TestERC712Base):
         data += data_to
         data += data_contents
         for i in range(8, len(data), 64):
-            logg.info('calldata {} {}'.format(i.to_bytes(2, byteorder='big').hex(), data[i:i+64]))
+            logg.info('calldata {} {}'.format((i-8).to_bytes(2, byteorder='big').hex(), data[i:i+64]))
         data = add_0x(data)
         tx = c.template(self.accounts[0], self.address)
         tx = c.set_code(tx, data)
