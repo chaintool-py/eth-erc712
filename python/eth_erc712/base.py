@@ -110,7 +110,7 @@ class EIP712DomainEncoder(ERC712Encoder):
         return self.__cache_data[:32]
 
 
-    def get_data_hash(self):
+    def get_type_hash(self):
         self.__cache()
         return self.__cache_data[32:64]
 
@@ -120,10 +120,14 @@ class EIP712DomainEncoder(ERC712Encoder):
         return self.__cache_data[64:]
 
 
+    def get_hash(self):
+        return keccak256(self.get_type_hash() + self.get_typed_data())
+
+
     def __str__(self):
         self.__cache()
         domain = self.get_domain()
-        data_hash = self.get_data_hash()
+        data_hash = self.get_type_hash()
         data = self.get_typed_data()
         s = 'erc712domain\t{}\nerc712type\t{}\nerc712data\n'.format(
                 domain.hex(),

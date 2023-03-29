@@ -28,7 +28,7 @@ contract Example {
     bytes32 public salt;
 
     bytes32 constant EIP712DOMAIN_TYPEHASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)"
     );
 
     bytes32 constant PERSON_TYPEHASH = keccak256(
@@ -47,7 +47,7 @@ contract Example {
             version: '1',
             chainId: 42,
             verifyingContract: address(this),
-	    salt: blockhash(block.number)
+	    salt: bytes32(uint256(0x029a))
         }));
     }
 
