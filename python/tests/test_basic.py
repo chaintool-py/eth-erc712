@@ -11,6 +11,7 @@ from chainlib.jsonrpc import JSONRPCRequest
 from chainlib.eth.contract import ABIContractEncoder
 from chainlib.eth.contract import ABIContractType
 from hexathon import add_0x
+from hexathon import strip_0x
 
 # local imports
 from eth_erc712.unittest import TestERC712 as TestERC712Base
@@ -30,10 +31,10 @@ class ExamplePerson(ERC712Encoder):
 
 
 class ExampleMail(EIP712DomainEncoder):
-    def __init__(self, from_name, from_wallet, to_name, to_wallet, contents, *args, **kwargs):
+    def __init__(self, from_name, from_wallet, to_name, to_wallet, contents, domain):
         self.pfrom = ExamplePerson(from_name, from_wallet)
         self.pto = ExamplePerson(to_name, to_wallet)
-        super(ExampleMail, self).__init__('Mail', *args, **kwargs)
+        super(ExampleMail, self).__init__('Mail', domain)
         self.typ_literal('Person from')
         self.typ_literal('Person to')
         self.add('contents', ABIContractType.STRING, contents)
@@ -67,28 +68,73 @@ class TestERC712(TestERC712Base):
 
 
     def test_mail(self):
-        a = os.urandom(20).hex()
-        b = os.urandom(20).hex()
-        mail = ExampleMail('Pinky Inky', a, 'Clyde Blinky', b, 'barbarbar', domain=self.domain)
+        a = os.urandom(20)
+        b = os.urandom(20)
+        mail_from_name = 'Pinky Inky'
+        mail_from_address = a.hex()
+        mail_to_name = 'Clyde Blinky'
+        mail_to_address = b.hex()
+        mail_contents = 'barbarbar'
+
+        mail = ExampleMail(
+                mail_from_name,
+                mail_from_address,
+                mail_to_name,
+                mail_to_address,
+                mail_contents,
+                self.domain,
+                )
         sig = self.signer.sign_typed_message(self.accounts[0], mail.get_domain(), mail.get_data_hash())
         sig = sig[:64] + (sig[64] + 27).to_bytes(1, byteorder='big')
         logg.debug('message is:\n{}\nsigned by {}'.format(mail, self.accounts[0]))
 
+        logg.debug('encode data from')
+        enc = ABIContractEncoder()
+        enc.string(mail_from_name)
+        enc.address(mail_from_address)
+        data_from = enc.get_contents()
+ 
+        logg.debug('encode data to')
+        enc = ABIContractEncoder()
+        enc.string(mail_to_name)
+        enc.address(mail_to_address)
+        data_to = enc.get_contents()
+
+        logg.debug('encode data contents')
+        enc = ABIContractEncoder()
+        enc.string(mail_contents)
+        data_contents = enc.get_contents()
+
+        logg.debug('encode structpointer')
+        enc = ABIContractEncoder()
+        enc.uint256(0x60)
+        enc.uint256(0xe0)
+        enc.uint256(0x160)
+        struct_pointers = enc.get_contents()
+
+        logg.debug('encode complete calldata')
         c = TxFactory(self.chain_spec)
         j = JSONRPCRequest()
         o = j.template()
         o['method'] = 'eth_call'
         enc = ABIContractEncoder()
         enc.method('verify')
-        enc.typ_literal('Mail')
+        enc.typ_literal('((string,address),(string,address),string)')
         enc.typ(ABIContractType.UINT8)
         enc.typ(ABIContractType.BYTES32)
         enc.typ(ABIContractType.BYTES32)
-        enc.bytes(mail.get_typed_data().hex())
+        enc.uint256(0x80) # outer struct pointer
         enc.uintn(sig[64], 8)
         enc.bytes32(sig[:32])
         enc.bytes32(sig[32:64])
-        data = add_0x(enc.get())
+        data = enc.get()
+        data += struct_pointers
+        data += data_from
+        data += data_to
+        data += data_contents
+        for i in range(8, len(data), 64):
+            logg.info('calldata {} {}'.format(i.to_bytes(2, byteorder='big').hex(), data[i:i+64]))
+        data = add_0x(data)
         tx = c.template(self.accounts[0], self.address)
         tx = c.set_code(tx, data)
         o['params'].append(c.normalize(tx))

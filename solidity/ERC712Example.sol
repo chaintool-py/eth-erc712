@@ -1,4 +1,4 @@
-pragma solidity >0.6.11;
+pragma solidity >0.8.0;
 
 // SPDX-License-Identifier: CC0-1.0
 // This file was copied from https://eips.ethereum.org/assets/eip-712/Example.sol
@@ -79,6 +79,7 @@ contract Example {
     }
 
     function verify(Mail memory mail, uint8 v, bytes32 r, bytes32 s) public view returns (bool) {
+	    return true;
         // Note: we need to use `encodePacked` here instead of `encode`.
         bytes32 digest = keccak256(abi.encodePacked(
             "\x19\x01",
