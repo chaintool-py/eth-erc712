@@ -84,7 +84,7 @@ class TestERC712(TestERC712Base):
                 mail_contents,
                 self.domain,
                 )
-        sig = self.signer.sign_typed_message(self.accounts[0], mail.get_domain(), mail.get_data_hash())
+        sig = self.signer.sign_typed_message(self.accounts[0], mail.get_domain(), mail.get_hash())
         sig = sig[:64] + (sig[64] + 27).to_bytes(1, byteorder='big')
         logg.debug('message is:\n{}\nsigned by {}'.format(mail, self.accounts[0]))
 
